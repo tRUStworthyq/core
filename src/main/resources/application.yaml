@@ -3,21 +3,22 @@ server:
 spring:
   application:
     name: core
-  datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:core}
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:core}
     username: ${DB_USERNAME:core}
     password: ${DB_PASSWORD:core_pass}
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-    show-sql: true
+  # Liquibase не умеет работать через R2DBC, поэтому миграции идут по отдельному JDBC-подключению
+  liquibase:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:core}
+    user: ${DB_USERNAME:core}
+    password: ${DB_PASSWORD:core_pass}
+    change-log: classpath:db/changelog/db.changelog-master.yaml
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_SCHEME}://keycloak:${KEYCLOAK_PORT}/realms/DACS
+logging:
+  level:
+    # аналог show-sql из JPA: выводит SQL-запросы R2DBC в лог
+    org.springframework.r2dbc.core: DEBUG
