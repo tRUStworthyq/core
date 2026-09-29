@@ -2,12 +2,12 @@ package com.trustworthyq.core.chat.controller;
 
 import com.trustworthyq.core.chat.dto.ChatResponse;
 import com.trustworthyq.core.chat.dto.CreateChatRequest;
+import com.trustworthyq.core.chat.dto.CreateChatTitleRequest;
 import com.trustworthyq.core.chat.dto.CursorPage;
 import com.trustworthyq.core.chat.service.ChatService;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -23,7 +23,7 @@ public class ChatController {
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<ChatResponse> createChat(@RequestHeader("X-User-Id") UUID ownerId,
                                          @Valid @RequestBody CreateChatRequest request) {
-        return chatService.createChat(ownerId, request.title());
+        return chatService.createChat(ownerId, request.content());
     }
 
     @GetMapping

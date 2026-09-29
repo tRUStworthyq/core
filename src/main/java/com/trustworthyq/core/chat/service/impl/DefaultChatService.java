@@ -4,15 +4,19 @@ import com.trustworthyq.core.chat.config.PaginationProperties;
 import com.trustworthyq.core.chat.dto.ChatResponse;
 import com.trustworthyq.core.chat.dto.CursorPage;
 import com.trustworthyq.core.chat.entity.ChatEntity;
+import com.trustworthyq.core.chat.entity.MessageEntity;
 import com.trustworthyq.core.chat.exception.ChatNotFoundException;
 import com.trustworthyq.core.chat.repository.ChatRepository;
+import com.trustworthyq.core.chat.repository.MessageRepository;
 import com.trustworthyq.core.chat.service.ChatService;
 import com.trustworthyq.core.common.CursorCodec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -20,11 +24,18 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class DefaultChatService implements ChatService {
 
+    private static final String DEFAULT_TITLE = "New chat";
+
     private final ChatRepository chatRepository;
+    private final MessageRepository messageRepository;
     private final PaginationProperties paginationProperties;
 
-    public Mono<ChatResponse> createChat(UUID ownerId, String title) {
-        return chatRepository.save(ChatEntity.create(ownerId, title))
+    @Transactional
+    public Mono<ChatResponse> createChat(UUID ownerId, String content) {
+        return chatRepository.save(ChatEntity.create(ownerId, DEFAULT_TITLE))
+                .flatMap(chat -> messageRepository
+                        .save(MessageEntity.create(chat.getId(), content))
+                        .thenReturn(chat))
                 .map(ChatResponse::from);
     }
 
@@ -51,6 +62,7 @@ public class DefaultChatService implements ChatService {
 
         return source.collectList().map(chats -> toPage(chats, pageSize));
     }
+
 
     private Flux<ChatEntity> decodeAndQuery(UUID ownerId, String cursor, int limitPlusOne) {
         CursorCodec.Cursor decoded = CursorCodec.decode(cursor);

@@ -33,8 +33,8 @@ public class DefaultMessageService implements MessageService {
     public Mono<MessageResponse> sendMessage(UUID ownerId, UUID chatId, String content) {
         return chatRepository.findByIdAndOwnerId(chatId, ownerId)
                 .switchIfEmpty(Mono.error(new ChatNotFoundException(chatId)))
-                .flatMap(chat -> messageRepository.save(MessageEntity.create(chatId, content))
-                        .flatMap(saved -> touchChat(chat).thenReturn(saved)))
+                .flatMap(chat -> messageRepository.save(MessageEntity.create(chatId, content)))
+                .flatMap(saved -> chatRepository.touch(chatId, Instant.now()).thenReturn(saved))
                 .map(MessageResponse::from);
     }
 

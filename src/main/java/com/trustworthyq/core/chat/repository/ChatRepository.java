@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.trustworthyq.core.chat.entity.ChatEntity;
+import org.springframework.data.r2dbc.repository.Modifying;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
@@ -29,4 +30,8 @@ public interface ChatRepository extends ReactiveCrudRepository<ChatEntity, UUID>
             LIMIT :limit
             """)
     Flux<ChatEntity> findFirstPage(UUID ownerId, int limit);
+
+    @Modifying
+    @Query("UPDATE chats SET updated_at = :now WHERE id = :id")
+    Mono<Integer> touch(UUID id, Instant now);
 }

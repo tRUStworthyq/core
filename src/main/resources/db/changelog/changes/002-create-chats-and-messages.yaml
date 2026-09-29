@@ -114,3 +114,16 @@ databaseChangeLog:
                   name: created_at
               - column:
                   name: id
+  - changeSet:
+      id: 6
+      author: core
+      changes:
+        - addColumn:
+            tableName: messages
+            columns:
+              - column:
+                  name: version
+                  type: bigint
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false

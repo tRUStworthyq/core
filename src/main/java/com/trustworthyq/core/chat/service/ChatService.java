@@ -8,7 +8,7 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 public interface ChatService {
-    Mono<ChatResponse> createChat(UUID ownerId, String title);
+    Mono<ChatResponse> createChat(UUID ownerId, String content);
     Mono<ChatResponse> getChat(UUID ownerId, UUID chatId);
     Mono<Void> deleteChat(UUID ownerId, UUID chatId);
     Mono<CursorPage<ChatResponse>> listChats(UUID ownerId, String cursor, Integer limit);

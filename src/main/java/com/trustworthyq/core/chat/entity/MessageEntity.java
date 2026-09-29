@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Getter
@@ -15,6 +16,9 @@ import org.springframework.data.relational.core.mapping.Table;
 @AllArgsConstructor
 @Table("messages")
 public class MessageEntity {
+
+    @Version
+    private Long version;
 
     @Id
     private UUID id;
@@ -27,6 +31,23 @@ public class MessageEntity {
 
     public static MessageEntity create(UUID chatId, String content) {
         Instant now = Instant.now();
-        return new MessageEntity(null, chatId, content, false, now, now, null);
+        MessageEntity entity = new MessageEntity();
+        entity.chatId = chatId;
+        entity.content = content;
+        entity.edited = false;
+        entity.createdAt = now;
+        entity.updatedAt = now;
+
+        return entity;
+    }
+
+    public void edit(String content) {
+        this.content = content;
+        this.edited = true;
+        this.updatedAt = Instant.now();
+    }
+
+    public void delete() {
+        this.deletedAt = Instant.now();
     }
 }
