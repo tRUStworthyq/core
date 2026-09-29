@@ -47,6 +47,13 @@ public class DefaultMessageService implements MessageService {
                     message.edit(newContent);
                     return messageRepository.save(message);
                 })
+                .flatMap(edited -> messageRepository
+                        .softDeleteAfter(
+                                chatId,
+                                edited.getCreatedAt(),
+                                edited.getId(),
+                                edited.getUpdatedAt())
+                        .thenReturn(edited))
                 .map(MessageResponse::from);
     }
 

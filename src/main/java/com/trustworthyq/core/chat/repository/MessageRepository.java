@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.trustworthyq.core.chat.entity.MessageEntity;
+import org.springframework.data.r2dbc.repository.Modifying;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
@@ -31,4 +32,16 @@ public interface MessageRepository extends ReactiveCrudRepository<MessageEntity,
             LIMIT :limit
             """)
     Flux<MessageEntity> findFirstPage(UUID chatId, int limit);
+
+    @Modifying
+    @Query("""
+            UPDATE messages
+            SET deleted_at = :now,
+                updated_at = :now,
+                version = version + 1
+            WHERE chat_id = :chatId
+                AND deleted_at IS NULL
+                AND (created_at, id) > (:createdAt, :id)
+            """)
+    Mono<Integer> softDeleteAfter(UUID chatId, Instant createdAt, UUID id, Instant now);
 }
