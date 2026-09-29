@@ -22,3 +22,8 @@ logging:
   level:
     # аналог show-sql из JPA: выводит SQL-запросы R2DBC в лог
     org.springframework.r2dbc.core: DEBUG
+
+app:
+  pagination:
+    chat-page-size: 20
+    message-page-size: 30
