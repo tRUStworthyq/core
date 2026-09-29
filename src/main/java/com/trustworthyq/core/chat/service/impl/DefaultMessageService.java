@@ -33,7 +33,7 @@ public class DefaultMessageService implements MessageService {
     public Mono<MessageResponse> sendMessage(UUID ownerId, UUID chatId, String content) {
         return chatRepository.findByIdAndOwnerId(chatId, ownerId)
                 .switchIfEmpty(Mono.error(new ChatNotFoundException(chatId)))
-                .flatMap(chat -> messageRepository.save(MessageEntity.create(chatId, content)))
+                .flatMap(chat -> messageRepository.save(MessageEntity.userMessage(chatId, content)))
                 .flatMap(saved -> chatRepository.touch(chatId, Instant.now()).thenReturn(saved))
                 .map(MessageResponse::from);
     }
@@ -44,9 +44,7 @@ public class DefaultMessageService implements MessageService {
                 .flatMap(chat -> messageRepository.findByIdAndChatIdAndDeletedAtIsNull(messageId, chatId))
                 .switchIfEmpty(Mono.error(new MessageNotFoundException(messageId)))
                 .flatMap(message -> {
-                    message.setContent(newContent);
-                    message.setEdited(true);
-                    message.setUpdatedAt(Instant.now());
+                    message.edit(newContent);
                     return messageRepository.save(message);
                 })
                 .map(MessageResponse::from);
@@ -58,7 +56,7 @@ public class DefaultMessageService implements MessageService {
                 .flatMap(chat -> messageRepository.findByIdAndChatIdAndDeletedAtIsNull(messageId, chatId))
                 .switchIfEmpty(Mono.error(new MessageNotFoundException(messageId)))
                 .flatMap(message -> {
-                    message.setDeletedAt(Instant.now());
+                    message.delete();
                     return messageRepository.save(message);
                 })
                 .then();
@@ -75,11 +73,6 @@ public class DefaultMessageService implements MessageService {
                             : decodeAndQuery(chatId, cursor, pageSize + 1);
                     return source.collectList().map(messages -> toPage(messages, pageSize));
                 });
-    }
-
-    private Mono<ChatEntity> touchChat(ChatEntity chat) {
-        chat.setUpdatedAt(Instant.now());
-        return chatRepository.save(chat);
     }
 
     private Flux<MessageEntity> decodeAndQuery(UUID chatId, String cursor, int limitPlusOne) {

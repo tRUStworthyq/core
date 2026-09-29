@@ -34,7 +34,7 @@ public class DefaultChatService implements ChatService {
     public Mono<ChatResponse> createChat(UUID ownerId, String content) {
         return chatRepository.save(ChatEntity.create(ownerId, DEFAULT_TITLE))
                 .flatMap(chat -> messageRepository
-                        .save(MessageEntity.create(chat.getId(), content))
+                        .save(MessageEntity.userMessage(chat.getId(), content))
                         .thenReturn(chat))
                 .map(ChatResponse::from);
     }

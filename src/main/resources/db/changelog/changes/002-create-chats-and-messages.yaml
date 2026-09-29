@@ -127,3 +127,18 @@ databaseChangeLog:
                   defaultValueNumeric: 0
                   constraints:
                     nullable: false
+  - changeSet:
+      id: 7
+      author: core
+      changes:
+        - addColumn:
+            tableName: messages
+            columns:
+              - column:
+                  name: role
+                  type: varchar(16)
+                  defaultValue: USER
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: ALTER TABLE messages ADD CONSTRAINT chk_messages_role CHECK (role IN ('USER', 'AGENT'))
