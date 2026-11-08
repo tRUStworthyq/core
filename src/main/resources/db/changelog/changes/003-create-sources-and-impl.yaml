@@ -1,0 +1,90 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-create-sources
+      author: your-name
+      changes:
+        - createTable:
+            tableName: sources
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+                    unique: true
+
+  - changeSet:
+      id: 003-create-impl
+      author: your-name
+      changes:
+        - createTable:
+            tableName: impl
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: config
+                  type: JSONB
+                  constraints:
+                    nullable: false
+              - column:
+                  name: state
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: impl
+            baseColumnNames: source_id
+            referencedTableName: sources
+            referencedColumnNames: id
+            constraintName: fk_impl_source
+
+  - changeSet:
+      id: 003-insert-default-sources
+      author: your-name
+      changes:
+        - insert:
+            tableName: sources
+            columns:
+              - column: { name: id, value: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" }
+              - column: { name: name, value: "DB" }
+        - insert:
+            tableName: sources
+            columns:
+              - column: { name: id, value: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12" }
+              - column: { name: name, value: "DWH" }
+        - insert:
+            tableName: sources
+            columns:
+              - column: { name: id, value: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13" }
+              - column: { name: name, value: "Data Lake" }
+        - insert:
+            tableName: sources
+            columns:
+              - column: { name: id, value: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14" }
+              - column: { name: name, value: "S3" }
+        - insert:
+            tableName: sources
+            columns:
+              - column: { name: id, value: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15" }
+              - column: { name: name, value: "File Storage" }
