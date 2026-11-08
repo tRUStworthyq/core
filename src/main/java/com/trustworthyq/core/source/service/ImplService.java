@@ -7,6 +7,7 @@ import com.trustworthyq.core.source.entity.Impl;
 import com.trustworthyq.core.source.enums.ImplState;
 import com.trustworthyq.core.source.repository.ImplRepository;
 import com.trustworthyq.core.source.repository.SourceRepository;
+import com.trustworthyq.core.source.utils.UUIDUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -42,12 +43,14 @@ public class ImplService {
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Source not found")))
                 .flatMap(source -> {
                     Impl impl = Impl.builder()
+                            .id(UUIDUtils.generateRandomUUID()) //генерация UUID
                             .name(request.getName())
                             .config(request.getConfig())
                             .state(request.getState() != null ? request.getState() : ImplState.NOT_RUN)
                             .sourceId(request.getSourceId())
+                            .isNew(true)
                             .build();
-                    return implRepository.save(impl);
+                    return implRepository.saveWithJsonbCast(impl);
                 })
                 .map(this::toDto);
     }
@@ -56,6 +59,7 @@ public class ImplService {
         return implRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Impl not found")))
                 .flatMap(existing -> {
+                    existing.setNew(false);
                     if (request.getName() != null) {
                         existing.setName(request.getName());
                     }
@@ -65,7 +69,7 @@ public class ImplService {
                     if (request.getState() != null) {
                         existing.setState(request.getState());
                     }
-                    return implRepository.save(existing);
+                    return implRepository.updateWithJsonbCast(existing);
                 })
                 .map(this::toDto);
     }

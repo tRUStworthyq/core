@@ -6,4 +6,4 @@ databaseChangeLog:
       file: db/changelog/changes/002-create-chats-and-messages.yaml
       relativeToChangelogFile: false
   - include:
-      file: changes/003-create-sources-and-impl.yaml
+      file: db/changelog/changes/003-create-sources-and-impl.yaml
