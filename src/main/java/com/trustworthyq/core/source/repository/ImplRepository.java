@@ -7,11 +7,14 @@ import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
 public interface ImplRepository extends ReactiveCrudRepository<Impl, UUID> {
 
-    Flux<Impl> findBySourceId(UUID sourceId);
+    Flux<Impl> findAllBy(Pageable pageable);
+    Flux<Impl> findBySourceId(UUID sourceId, Pageable pageable);
+    Mono<Long> countBySourceId(UUID sourceId);
 
     @Query("""
     INSERT INTO "impl" ("id", "name", "config", "state", "source_id")

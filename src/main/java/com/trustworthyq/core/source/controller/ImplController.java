@@ -4,25 +4,27 @@ import com.trustworthyq.core.source.dto.CreateImplRequest;
 import com.trustworthyq.core.source.dto.ImplResponse;
 import com.trustworthyq.core.source.dto.UpdateImplRequest;
 import com.trustworthyq.core.source.service.ImplService;
+import com.trustworthyq.core.source.utils.PageableFactory;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/impls")
+@RequestMapping("/api/impls")
 @RequiredArgsConstructor
 public class ImplController {
 
     private final ImplService implService;
+    private final PageableFactory pageableFactory;
 
     @GetMapping
-    public Flux<ImplResponse> getAll() {
-        return implService.findAll();
+    public Mono<Page<ImplResponse>> getAll(@RequestParam(required = false) Integer page) {
+        return implService.findAll(pageableFactory.forImpls(page));
     }
 
     @GetMapping("/{id}")
@@ -31,8 +33,9 @@ public class ImplController {
     }
 
     @GetMapping("/by-source/{sourceId}")
-    public Flux<ImplResponse> getBySourceId(@PathVariable UUID sourceId) {
-        return implService.findBySourceId(sourceId);
+    public Mono<Page<ImplResponse>> getBySourceId(@PathVariable UUID sourceId,
+                                                  @RequestParam(required = false) Integer page) {
+        return implService.findBySourceId(sourceId, pageableFactory.forImpls(page));
     }
 
     @PostMapping
@@ -42,7 +45,7 @@ public class ImplController {
     }
 
     @PutMapping("/{id}")
-    public Mono<ImplResponse> update(@PathVariable UUID id, @RequestBody UpdateImplRequest request) {
+    public Mono<ImplResponse> update(@PathVariable UUID id, @Valid @RequestBody UpdateImplRequest request) {
         return implService.update(id, request);
     }
 
