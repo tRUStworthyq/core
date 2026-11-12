@@ -27,3 +27,5 @@ app:
   pagination:
     chat-page-size: 20
     message-page-size: 30
+    source-page-size: 20
+    impl-page-size: 20
