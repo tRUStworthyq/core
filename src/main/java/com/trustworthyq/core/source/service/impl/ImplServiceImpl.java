@@ -8,7 +8,7 @@ import com.trustworthyq.core.source.enums.ImplState;
 import com.trustworthyq.core.source.repository.ImplRepository;
 import com.trustworthyq.core.source.repository.SourceRepository;
 import com.trustworthyq.core.source.service.ImplService;
-import com.trustworthyq.core.source.utils.UUIDUtils;
+import com.trustworthyq.core.utils.UUIDUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
