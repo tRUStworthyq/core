@@ -1,4 +1,4 @@
-package com.trustworthyq.core.source.utils;
+package com.trustworthyq.core.utils;
 
 import java.util.UUID;
 
