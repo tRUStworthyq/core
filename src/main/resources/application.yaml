@@ -21,7 +21,6 @@ spring:
       chat:
         model: ${OLLAMA_MODEL:qwen3:8b}
         think: false
-        num-predict: 512
   application:
     name: core
   r2dbc:
@@ -45,6 +44,9 @@ logging:
     org.springframework.r2dbc.core: DEBUG
 
 app:
+  chat:
+    context-tokens: ${OLLAMA_CONTEXT_TOKENS:8192}
+    output-tokens: ${OLLAMA_MAX_OUTPUT_TOKENS:1024}
   kafka:
     topic: DACS_agent_request
     response-topic: DACS_agent_response

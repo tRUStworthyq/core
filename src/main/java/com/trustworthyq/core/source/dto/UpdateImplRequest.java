@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 public class UpdateImplRequest {
 
-    @Size(min = 1, max = 255)
+    @Size(min = 1, max = 100)
     @NotBlank
     private String name;
 

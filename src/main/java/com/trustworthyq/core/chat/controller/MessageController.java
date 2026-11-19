@@ -1,6 +1,7 @@
 package com.trustworthyq.core.chat.controller;
 
 import com.trustworthyq.core.chat.dto.CreateMessageRequest;
+import com.trustworthyq.core.chat.dto.ChatStreamEvent;
 import com.trustworthyq.core.chat.dto.CursorPage;
 import com.trustworthyq.core.chat.dto.MessageResponse;
 import com.trustworthyq.core.chat.dto.UpdateMessageRequest;
@@ -9,10 +10,12 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
 @RestController
 @RequestMapping("/api/chats/{chatId}/messages")
@@ -20,6 +23,12 @@ import reactor.core.publisher.Mono;
 public class MessageController {
 
     private final MessageService messageService;
+
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ChatStreamEvent> streamMessage(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID chatId,
+                                               @Valid @RequestBody CreateMessageRequest request) {
+        return messageService.streamMessage(UUID.fromString(jwt.getSubject()), chatId, request.content(), request.requestId());
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

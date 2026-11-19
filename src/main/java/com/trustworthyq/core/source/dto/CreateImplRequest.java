@@ -13,7 +13,7 @@ import java.util.UUID;
 public class CreateImplRequest {
 
     @NotBlank
-    @Size(max = 255)
+    @Size(max = 100)
     private String name;
 
     @NotBlank

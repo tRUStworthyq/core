@@ -1,0 +1,33 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-hide-deleted-collection-objects
+      author: dacs
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE s3_archive ADD COLUMN deleted_at timestamptz;
+              UPDATE s3_archive SET deleted_at = statement_timestamp() WHERE state = 'DELETED';
+              CREATE INDEX s3_archive_deleted_source_idx ON s3_archive (
+                  owner_id, impl_id, (payload->'source'->>'bucket'), (payload->'source'->>'key'), deleted_at
+              ) WHERE state = 'DELETED';
+              CREATE VIEW visible_collection_objects AS
+              SELECT r.id AS request_id, r.owner_id, r.implementation_id, r.created_at,
+                     b.batch_index, item.position, item.value AS metadata
+              FROM collection_runs r JOIN agent_response_batches b
+                ON b.request_id = r.id AND b.implementation_id = r.implementation_id
+              CROSS JOIN LATERAL jsonb_array_elements(b.items) WITH ORDINALITY AS item(value, position)
+              WHERE b.status = 'BATCH'
+                AND NOT EXISTS (
+                    SELECT 1 FROM s3_archive a
+                    WHERE a.owner_id = r.owner_id AND a.impl_id = r.implementation_id
+                      AND a.state = 'DELETED' AND a.deleted_at >= r.created_at
+                      AND a.payload->'source'->>'bucket' = split_part(substring(item.value->>'path' FROM 6), '/', 1)
+                      AND item.value->>'path' = 's3://' || (a.payload->'source'->>'bucket')
+                                               || '/' || (a.payload->'source'->>'key')
+                );
+      rollback:
+        - sql:
+            sql: |
+              DROP VIEW visible_collection_objects;
+              DROP INDEX s3_archive_deleted_source_idx;
+              ALTER TABLE s3_archive DROP COLUMN deleted_at;

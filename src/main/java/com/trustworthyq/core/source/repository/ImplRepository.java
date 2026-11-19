@@ -21,6 +21,7 @@ public interface ImplRepository extends ReactiveCrudRepository<Impl, UUID> {
     @Query("""
     INSERT INTO "impl" ("id", "name", "config", "state", "source_id", "owner_id")
     VALUES (:#{#impl.id}, :#{#impl.name}, CAST(:#{#impl.config} AS jsonb), :#{#impl.state}, :#{#impl.sourceId}, :#{#impl.ownerId})
+    ON CONFLICT ("owner_id", lower(btrim("name"))) DO NOTHING
     RETURNING *
     """)
     Mono<Impl> saveWithJsonbCast(@Param("impl") Impl impl);

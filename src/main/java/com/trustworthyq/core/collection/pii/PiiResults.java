@@ -19,14 +19,11 @@ import java.util.UUID;
 public class PiiResults {
     private static final String OBJECTS = """
             WITH objects AS (
-                SELECT r.implementation_id, b.batch_index, item.position,
-                       item.value->>'path' AS path,
-                       CASE WHEN jsonb_typeof(item.value->'pii') = 'object' THEN item.value->'pii' END AS pii,
-                       coalesce(item.value->'pii'->>'status', 'NOT_SCANNED') AS status
-                FROM collection_runs r JOIN agent_response_batches b
-                  ON b.request_id = r.id AND b.implementation_id = r.implementation_id
-                CROSS JOIN LATERAL jsonb_array_elements(b.items) WITH ORDINALITY AS item(value, position)
-                WHERE r.id = :run AND r.owner_id = :owner AND b.status = 'BATCH'
+                SELECT implementation_id, batch_index, position,
+                       metadata->>'path' AS path,
+                       CASE WHEN jsonb_typeof(metadata->'pii') = 'object' THEN metadata->'pii' END AS pii,
+                       coalesce(metadata->'pii'->>'status', 'NOT_SCANNED') AS status
+                FROM visible_collection_objects WHERE request_id = :run AND owner_id = :owner
             )
             """;
 

@@ -6,6 +6,7 @@ import com.trustworthyq.core.source.service.ImplService;
 import com.trustworthyq.core.utils.UUIDUtils;
 import com.trustworthyq.core.collection.repository.AgentResponseRepository;
 import com.trustworthyq.core.collection.repository.AgentResponseRepository.RunStatus;
+import com.trustworthyq.core.collection.repository.AgentResponseRepository.RunHistoryItem;
 import com.trustworthyq.core.collection.scoring.AgingCalculator;
 import com.trustworthyq.core.collection.scoring.AgingCalculator.Assessment;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +52,19 @@ public class CollectionService {
     public Mono<RunStatus> status(UUID ownerId, UUID requestId) {
         return responses.status(requestId, ownerId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Collection run not found")));
+    }
+
+    public Mono<RunHistoryPage> history(UUID ownerId, UUID implId, long offset, int limit) {
+        long start = Math.max(0, offset);
+        int pageSize = Math.clamp(limit, 1, 100);
+        return implService.findById(ownerId, implId)
+                .thenMany(responses.history(ownerId, implId, start, pageSize + 1))
+                .collectList()
+                .map(items -> new RunHistoryPage(items.stream().limit(pageSize).toList(),
+                        items.size() > pageSize ? start + pageSize : null));
+    }
+
+    public record RunHistoryPage(List<RunHistoryItem> items, Long nextOffset) {
     }
 
     public Mono<List<JsonNode>> objects(UUID ownerId, UUID requestId, long offset, int limit, String piiStatus) {

@@ -1,0 +1,45 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-unique-impl-names
+      author: dacs
+      changes:
+        - sql:
+            splitStatements: false
+            sql: |
+              LOCK TABLE impl IN SHARE ROW EXCLUSIVE MODE;
+              DO $$
+              DECLARE
+                  duplicate record;
+                  candidate text;
+                  suffix text;
+                  counter integer;
+              BEGIN
+                  FOR duplicate IN
+                      SELECT id, owner_id, name
+                      FROM (
+                          SELECT id, owner_id, name, row_number() OVER (
+                              PARTITION BY owner_id, lower(btrim(name)) ORDER BY id
+                          ) AS name_rank
+                          FROM impl WHERE owner_id IS NOT NULL
+                      ) ranked
+                      WHERE name_rank > 1
+                      ORDER BY id
+                  LOOP
+                      counter := 2;
+                      LOOP
+                          suffix := ' (' || counter || ')';
+                          candidate := left(btrim(duplicate.name), 100 - length(suffix)) || suffix;
+                          EXIT WHEN NOT EXISTS (
+                              SELECT 1 FROM impl
+                              WHERE owner_id = duplicate.owner_id
+                                AND lower(btrim(name)) = lower(candidate)
+                          );
+                          counter := counter + 1;
+                      END LOOP;
+                      UPDATE impl SET name = candidate WHERE id = duplicate.id;
+                  END LOOP;
+              END $$;
+              CREATE UNIQUE INDEX impl_owner_name_uidx ON impl (owner_id, lower(btrim(name)));
+      rollback:
+        - sql:
+            sql: DROP INDEX impl_owner_name_uidx;

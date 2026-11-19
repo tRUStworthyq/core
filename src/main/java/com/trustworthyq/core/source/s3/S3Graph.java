@@ -29,10 +29,9 @@ public class S3Graph {
                 ORDER BY r.created_at DESC, r.id DESC
                 LIMIT 1
             ), objects AS (
-                SELECT substr(item.value->>'path', 6) AS location, item.value AS metadata
-                FROM snapshot s JOIN agent_response_batches b ON b.request_id = s.id
-                CROSS JOIN LATERAL jsonb_array_elements(b.items) AS item(value)
-                WHERE b.status = 'BATCH' AND starts_with(item.value->>'path', 's3://')
+                SELECT substr(o.metadata->>'path', 6) AS location, o.metadata
+                FROM snapshot s JOIN visible_collection_objects o ON o.request_id = s.id
+                WHERE starts_with(o.metadata->>'path', 's3://')
             )
             """;
 

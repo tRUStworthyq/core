@@ -69,16 +69,42 @@ public class AgentResponseRepository {
                 .one();
     }
 
+    public Flux<RunHistoryItem> history(UUID ownerId, UUID implId, long offset, int limit) {
+        return database.sql("""
+                WITH page AS (
+                    SELECT id, created_at, dispatch_failed FROM collection_runs
+                    WHERE owner_id = :owner AND implementation_id = :impl
+                    ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset
+                )
+                SELECT p.id, p.created_at,
+                       CASE WHEN p.dispatch_failed OR count(*) FILTER (WHERE b.status = 'FAILED') > 0 THEN 'FAILED'
+                            WHEN max(b.batch_index) FILTER (WHERE b.status = 'COMPLETED')
+                                 = count(*) FILTER (WHERE b.status = 'BATCH') THEN 'COMPLETED'
+                            WHEN count(b.batch_index) > 0 THEN 'RUNNING'
+                            ELSE 'QUEUED' END AS status,
+                       coalesce(sum(jsonb_array_length(b.items)), 0) AS processed,
+                       max(b.error) AS error
+                FROM page p LEFT JOIN agent_response_batches b
+                  ON b.request_id = p.id AND b.implementation_id = :impl
+                GROUP BY p.id, p.created_at, p.dispatch_failed
+                ORDER BY p.created_at DESC, p.id DESC
+                """)
+                .bind("owner", ownerId).bind("impl", implId).bind("offset", offset).bind("limit", limit)
+                .map((row, ignored) -> new RunHistoryItem(row.get("id", UUID.class),
+                        row.get("created_at", java.time.OffsetDateTime.class).toInstant(),
+                        row.get("status", String.class), row.get("processed", Long.class),
+                        row.get("error", String.class)))
+                .all();
+    }
+
     public Flux<JsonNode> objects(UUID requestId, UUID ownerId, long offset, int limit, String piiStatus,
                                   JsonMapper mapper) {
         return database.sql("""
-                SELECT item.value::text AS object
-                FROM collection_runs r JOIN agent_response_batches b
-                  ON b.request_id = r.id AND b.implementation_id = r.implementation_id
-                CROSS JOIN LATERAL jsonb_array_elements(b.items) WITH ORDINALITY AS item(value, position)
-                WHERE r.id = :id AND r.owner_id = :owner AND b.status = 'BATCH'
-                  AND (:piiStatus = '' OR coalesce(item.value->'pii'->>'status', 'NOT_SCANNED') = :piiStatus)
-                ORDER BY b.batch_index, item.position
+                SELECT metadata::text AS object
+                FROM visible_collection_objects
+                WHERE request_id = :id AND owner_id = :owner
+                  AND (:piiStatus = '' OR coalesce(metadata->'pii'->>'status', 'NOT_SCANNED') = :piiStatus)
+                ORDER BY batch_index, position
                 LIMIT :limit OFFSET :offset
                 """)
                 .bind("id", requestId).bind("owner", ownerId)
@@ -91,13 +117,10 @@ public class AgentResponseRepository {
                                              JsonMapper mapper) {
         return database.sql("""
                 WITH objects AS (
-                    SELECT item.value AS object, item.value->>'sha256' AS hash,
-                           (item.value->>'modificationTime')::timestamptz AS modified,
-                           b.batch_index, item.position, r.created_at
-                    FROM collection_runs r JOIN agent_response_batches b
-                      ON b.request_id = r.id AND b.implementation_id = r.implementation_id
-                    CROSS JOIN LATERAL jsonb_array_elements(b.items) WITH ORDINALITY AS item(value, position)
-                    WHERE r.id = :id AND r.owner_id = :owner AND b.status = 'BATCH'
+                    SELECT metadata AS object, metadata->>'sha256' AS hash,
+                           (metadata->>'modificationTime')::timestamptz AS modified,
+                           batch_index, position, created_at
+                    FROM visible_collection_objects WHERE request_id = :id AND owner_id = :owner
                 ), ranked AS (
                     SELECT *, max(modified) OVER duplicates AS newest,
                            count(*) OVER duplicates AS copies,
@@ -126,5 +149,9 @@ public class AgentResponseRepository {
     }
 
     public record RunStatus(UUID requestId, String status, long processed, String error) {
+    }
+
+    public record RunHistoryItem(UUID requestId, java.time.Instant createdAt, String status,
+                                 long processed, String error) {
     }
 }

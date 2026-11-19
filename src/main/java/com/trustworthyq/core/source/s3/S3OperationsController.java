@@ -7,9 +7,12 @@ import com.trustworthyq.core.source.s3.S3Graph.BucketPage;
 import com.trustworthyq.core.source.s3.S3Graph.Children;
 import com.trustworthyq.core.source.s3.S3Operations.ObjectLocation;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
@@ -21,6 +24,11 @@ public class S3OperationsController {
     private final S3Operations s3;
     private final S3Graph graph;
     private final S3Archive archive;
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ProblemDetail> s3Error(ResponseStatusException error) {
+        return ResponseEntity.of(error.getBody()).build();
+    }
 
     @GetMapping("/buckets")
     public Mono<BucketPage> buckets(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,

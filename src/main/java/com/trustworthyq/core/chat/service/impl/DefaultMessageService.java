@@ -2,9 +2,11 @@ package com.trustworthyq.core.chat.service.impl;
 
 import com.trustworthyq.core.ai.service.impl.OllamaChatServiceImpl;
 import com.trustworthyq.core.chat.config.PaginationProperties;
+import com.trustworthyq.core.chat.dto.ChatStreamEvent;
 import com.trustworthyq.core.chat.dto.CursorPage;
 import com.trustworthyq.core.chat.dto.MessageResponse;
 import com.trustworthyq.core.chat.entity.MessageEntity;
+import com.trustworthyq.core.chat.entity.ChatEntity;
 import com.trustworthyq.core.chat.exception.ChatNotFoundException;
 import com.trustworthyq.core.chat.exception.MessageNotFoundException;
 import com.trustworthyq.core.chat.repository.ChatRepository;
@@ -15,7 +17,9 @@ import com.trustworthyq.core.common.CursorCodec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +30,7 @@ import reactor.core.publisher.Mono;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DefaultMessageService implements MessageService {
 
     private static final int AI_HISTORY_LIMIT = 30;
@@ -44,6 +49,47 @@ public class DefaultMessageService implements MessageService {
                         .flatMap(reply -> saveTurn(ownerId, chatId, history, content, reply)));
     }
 
+    @Override
+    public Flux<ChatStreamEvent> streamMessage(UUID ownerId, UUID chatId, String content, UUID requestId) {
+        return chatRepository.findByIdAndOwnerId(chatId, ownerId)
+                .switchIfEmpty(Mono.error(new ChatNotFoundException(chatId)))
+                .then(recentHistory(chatId))
+                .flatMapMany(history -> streamTurn(history, ownerId, content, requestId,
+                        reply -> saveTurn(ownerId, chatId, history, content, reply).thenReturn(chatId)));
+    }
+
+    @Override
+    public Flux<ChatStreamEvent> streamNewChat(UUID ownerId, String content, UUID requestId) {
+        return streamTurn(List.of(), ownerId, content, requestId,
+                reply -> chatRepository.save(ChatEntity.create(ownerId, DefaultChatService.DEFAULT_TITLE))
+                        .flatMap(chat -> saveMessages(chat.getId(), content, reply).thenReturn(chat.getId()))
+                        .as(transaction::transactional));
+    }
+
+    private Flux<ChatStreamEvent> streamTurn(List<MessageResponse> history, UUID ownerId, String content,
+                                             UUID requestId, Function<String, Mono<UUID>> save) {
+        return Flux.defer(() -> {
+            var reply = new StringBuilder();
+            var deltas = ollama.stream(history, content, ownerId, requestId)
+                    .map(chunk -> {
+                        reply.append(chunk);
+                        return ChatStreamEvent.delta(chunk);
+                    });
+            var done = Mono.defer(() -> reply.toString().isBlank()
+                    ? Mono.<UUID>error(new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Ollama returned an empty reply"))
+                    : save.apply(reply.toString())).map(ChatStreamEvent::done);
+            return Flux.concat(Mono.just(ChatStreamEvent.phase(requestId == null ? "GENERATING" : "ANALYZING")),
+                            deltas, done)
+                    .onErrorResume(error -> {
+                        if (error instanceof ResponseStatusException failure && failure.getReason() != null) {
+                            return Mono.just(ChatStreamEvent.error(failure.getReason()));
+                        }
+                        log.warn("Chat stream failed: {}", error.getClass().getSimpleName());
+                        return Mono.just(ChatStreamEvent.error("Chat response could not be saved or generated"));
+                    });
+        });
+    }
+
     private Mono<List<MessageResponse>> recentHistory(UUID chatId) {
         return messageRepository.findRecentMessages(chatId, AI_HISTORY_LIMIT)
                 .map(MessageResponse::from)
@@ -57,11 +103,15 @@ public class DefaultMessageService implements MessageService {
                 .then(recentHistory(chatId))
                 .filter(history::equals)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.CONFLICT, "Chat changed during generation")))
-                .flatMap(current -> messageRepository.save(MessageEntity.userMessage(chatId, content)))
+                .flatMap(current -> saveMessages(chatId, content, reply))
+                .as(transaction::transactional);
+    }
+
+    private Mono<MessageResponse> saveMessages(UUID chatId, String content, String reply) {
+        return messageRepository.save(MessageEntity.userMessage(chatId, content))
                 .flatMap(user -> messageRepository.save(MessageEntity.agentMessage(chatId, reply))
                         .flatMap(agent -> chatRepository.touch(chatId, agent.getCreatedAt()))
-                        .thenReturn(MessageResponse.from(user)))
-                .as(transaction::transactional);
+                        .thenReturn(MessageResponse.from(user)));
     }
 
     private Mono<Void> lockChat(UUID ownerId, UUID chatId) {

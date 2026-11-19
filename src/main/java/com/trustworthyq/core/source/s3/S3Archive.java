@@ -127,7 +127,8 @@ public class S3Archive {
                         return Mono.error(conflict("Archive copy has been deleted"));
                     }
                     return action.apply(object).flatMap(details -> database.sql("""
-                                    UPDATE s3_archive SET state = :state, payload = CAST(:payload AS jsonb)
+                                    UPDATE s3_archive SET state = :state, payload = CAST(:payload AS jsonb),
+                                        deleted_at = CASE WHEN :state = 'DELETED' THEN statement_timestamp() END
                                     WHERE id = :id AND owner_id = :owner AND impl_id = :impl
                                     """)
                             .bind("id", id).bind("owner", owner).bind("impl", impl)

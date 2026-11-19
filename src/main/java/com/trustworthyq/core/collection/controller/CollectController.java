@@ -2,6 +2,7 @@ package com.trustworthyq.core.collection.controller;
 
 import com.trustworthyq.core.collection.repository.AgentResponseRepository.RunStatus;
 import com.trustworthyq.core.collection.service.CollectionService;
+import com.trustworthyq.core.collection.service.CollectionService.RunHistoryPage;
 import com.trustworthyq.core.collection.scoring.AgingCalculator.Assessment;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,13 @@ public class CollectController {
     @GetMapping("/runs/{requestId}")
     public Mono<RunStatus> status(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID requestId) {
         return collectionService.status(UUID.fromString(jwt.getSubject()), requestId);
+    }
+
+    @GetMapping("/{id}/runs")
+    public Mono<RunHistoryPage> history(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                        @RequestParam(defaultValue = "0") long offset,
+                                        @RequestParam(defaultValue = "20") int limit) {
+        return collectionService.history(UUID.fromString(jwt.getSubject()), id, offset, limit);
     }
 
     @GetMapping("/runs/{requestId}/objects")

@@ -10,6 +10,7 @@ import com.trustworthyq.core.source.repository.SourceRepository;
 import com.trustworthyq.core.source.service.ImplService;
 import com.trustworthyq.core.utils.UUIDUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpStatus;
@@ -60,13 +61,14 @@ public class ImplServiceImpl implements ImplService {
                     Impl impl = Impl.builder()
                             .id(UUIDUtils.generateRandomUUID())
                             .ownerId(ownerId)
-                            .name(request.getName())
+                            .name(request.getName().strip())
                             .config(request.getConfig())
                             .state(request.getState() != null ? request.getState() : ImplState.NOT_RUN)
                             .sourceId(request.getSourceId())
                             .isNew(true)
                             .build();
-                    return implRepository.saveWithJsonbCast(impl);
+                    return implRepository.saveWithJsonbCast(impl)
+                            .switchIfEmpty(Mono.error(this::nameConflict));
                 })
                 .map(this::toDto);
     }
@@ -77,6 +79,7 @@ public class ImplServiceImpl implements ImplService {
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Impl not found")))
                 .map(existing -> applyUpdate(existing, request))
                 .flatMap(implRepository::updateWithJsonbCast)
+                .onErrorMap(DuplicateKeyException.class, error -> nameConflict())
                 .map(this::toDto);
     }
 
@@ -90,7 +93,7 @@ public class ImplServiceImpl implements ImplService {
     private Impl applyUpdate(Impl existing, UpdateImplRequest request) {
         existing.setNew(false);
         if (request.getName() != null) {
-            existing.setName(request.getName());
+            existing.setName(request.getName().strip());
         }
         if (request.getConfig() != null) {
             existing.setConfig(request.getConfig());
@@ -99,6 +102,10 @@ public class ImplServiceImpl implements ImplService {
             existing.setState(request.getState());
         }
         return existing;
+    }
+
+    private ResponseStatusException nameConflict() {
+        return new ResponseStatusException(HttpStatus.CONFLICT, "An implementation with this name already exists");
     }
 
     private ImplResponse toDto(Impl impl) {

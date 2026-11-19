@@ -204,6 +204,11 @@ public class S3Operations {
                     try (S3Client client = client(config)) {
                         return operation.apply(client, config);
                     } catch (S3Exception exception) {
+                        var details = exception.awsErrorDetails();
+                        if (details != null && "NoSuchBucket".equals(details.errorCode())) {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                    "Бакет S3 не найден. Проверьте bucket и archiveBucket в настройках подключения.");
+                        }
                         HttpStatus status = switch (exception.statusCode()) {
                             case 400 -> HttpStatus.BAD_REQUEST;
                             case 401, 403 -> HttpStatus.FORBIDDEN;

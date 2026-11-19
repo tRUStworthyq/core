@@ -13,3 +13,7 @@ databaseChangeLog:
       file: db/changelog/changes/005-own-collection-runs.yaml
   - include:
       file: db/changelog/changes/006-s3-archive.yaml
+  - include:
+      file: db/changelog/changes/007-hide-deleted-collection-objects.yaml
+  - include:
+      file: db/changelog/changes/008-unique-impl-names.yaml

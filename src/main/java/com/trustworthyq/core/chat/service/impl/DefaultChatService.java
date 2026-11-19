@@ -24,7 +24,7 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class DefaultChatService implements ChatService {
 
-    private static final String DEFAULT_TITLE = "New chat";
+    static final String DEFAULT_TITLE = "New chat";
 
     private final ChatRepository chatRepository;
     private final MessageRepository messageRepository;
