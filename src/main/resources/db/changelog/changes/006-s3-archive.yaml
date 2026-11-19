@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-s3-archive
+      author: dacs
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE s3_archive (
+                  id uuid PRIMARY KEY,
+                  owner_id uuid NOT NULL,
+                  impl_id uuid NOT NULL,
+                  state text NOT NULL CHECK (state IN ('PENDING', 'ARCHIVED', 'RESTORED', 'DELETED')),
+                  payload jsonb NOT NULL,
+                  created_at timestamptz NOT NULL DEFAULT now()
+              );
+              CREATE INDEX s3_archive_page_idx ON s3_archive
+                  (owner_id, impl_id, state, created_at DESC, id DESC);
+      rollback:
+        - dropTable:
+            tableName: s3_archive

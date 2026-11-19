@@ -9,6 +9,8 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
@@ -21,26 +23,26 @@ public class ChatController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Mono<ChatResponse> createChat(@RequestHeader("X-User-Id") UUID ownerId,
+    public Mono<ChatResponse> createChat(@AuthenticationPrincipal Jwt jwt,
                                          @Valid @RequestBody CreateChatRequest request) {
-        return chatService.createChat(ownerId, request.content());
+        return chatService.createChat(UUID.fromString(jwt.getSubject()), request.content());
     }
 
     @GetMapping
-    public Mono<CursorPage<ChatResponse>> listChats(@RequestHeader("X-User-Id") UUID ownerId,
+    public Mono<CursorPage<ChatResponse>> listChats(@AuthenticationPrincipal Jwt jwt,
                                                     @RequestParam(required = false) String cursor,
                                                     @RequestParam(required = false) Integer limit) {
-        return chatService.listChats(ownerId, cursor, limit);
+        return chatService.listChats(UUID.fromString(jwt.getSubject()), cursor, limit);
     }
 
     @GetMapping("/{chatId}")
-    public Mono<ChatResponse> getChat(@RequestHeader("X-User-Id") UUID ownerId, @PathVariable UUID chatId) {
-        return chatService.getChat(ownerId, chatId);
+    public Mono<ChatResponse> getChat(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID chatId) {
+        return chatService.getChat(UUID.fromString(jwt.getSubject()), chatId);
     }
 
     @DeleteMapping("/{chatId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public Mono<Void> deleteChat(@RequestHeader("X-User-Id") UUID ownerId, @PathVariable UUID chatId) {
-        return chatService.deleteChat(ownerId, chatId);
+    public Mono<Void> deleteChat(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID chatId) {
+        return chatService.deleteChat(UUID.fromString(jwt.getSubject()), chatId);
     }
 }

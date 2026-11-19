@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-create-agent-response-batches
+      author: dacs
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE agent_response_batches (
+                  request_id uuid NOT NULL,
+                  implementation_id uuid,
+                  source_id uuid,
+                  batch_index bigint NOT NULL CHECK (batch_index >= 0),
+                  status text NOT NULL CHECK (status IN ('BATCH', 'COMPLETED', 'FAILED')),
+                  items jsonb NOT NULL CHECK (jsonb_typeof(items) = 'array'),
+                  error text,
+                  received_at timestamptz NOT NULL DEFAULT now(),
+                  PRIMARY KEY (request_id, batch_index)
+              );
+              CREATE INDEX agent_response_batches_implementation_idx
+                  ON agent_response_batches (implementation_id, received_at DESC);
+      rollback:
+        - dropTable:
+            tableName: agent_response_batches

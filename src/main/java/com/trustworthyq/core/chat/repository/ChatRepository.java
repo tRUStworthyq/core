@@ -14,6 +14,9 @@ public interface ChatRepository extends ReactiveCrudRepository<ChatEntity, UUID>
 
     Mono<ChatEntity> findByIdAndOwnerId(UUID id, UUID ownerId);
 
+    @Query("SELECT * FROM chats WHERE id = :id AND owner_id = :ownerId FOR UPDATE")
+    Mono<ChatEntity> lockByIdAndOwnerId(UUID id, UUID ownerId);
+
     @Query("""
             SELECT * FROM chats
             WHERE owner_id = :ownerId

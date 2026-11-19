@@ -33,6 +33,14 @@ public interface MessageRepository extends ReactiveCrudRepository<MessageEntity,
             """)
     Flux<MessageEntity> findFirstPage(UUID chatId, int limit);
 
+    @Query("""
+            SELECT * FROM messages
+            WHERE chat_id = :chatId AND deleted_at IS NULL
+            ORDER BY created_at DESC, id DESC
+            LIMIT :limit
+            """)
+    Flux<MessageEntity> findRecentMessages(UUID chatId, int limit);
+
     @Modifying
     @Query("""
             UPDATE messages

@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-own-collection-runs
+      author: dacs
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE impl ADD COLUMN owner_id uuid;
+              CREATE INDEX impl_owner_idx ON impl (owner_id);
+              CREATE TABLE collection_runs (
+                  id uuid PRIMARY KEY,
+                  owner_id uuid NOT NULL,
+                  implementation_id uuid NOT NULL,
+                  created_at timestamptz NOT NULL DEFAULT now(),
+                  dispatch_failed boolean NOT NULL DEFAULT false
+              );
+      rollback:
+        - sql:
+            sql: |
+              DROP TABLE collection_runs;
+              ALTER TABLE impl DROP COLUMN owner_id;

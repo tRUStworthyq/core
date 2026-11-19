@@ -25,6 +25,9 @@ public class Impl implements Persistable<UUID> {
 
     private String name;
 
+    @Column("owner_id")
+    private UUID ownerId;
+
     private String config;
 
     private ImplState state;

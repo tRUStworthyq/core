@@ -10,10 +10,10 @@ import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
 public interface ImplService {
-    Mono<Page<ImplResponse>> findAll(Pageable pageable);
-    Mono<ImplResponse> findById(UUID id);
-    Mono<Page<ImplResponse>> findBySourceId(UUID sourceId, Pageable pageable);
-    Mono<ImplResponse> create(CreateImplRequest request);
-    Mono<ImplResponse> update(UUID id, UpdateImplRequest request);
-    Mono<Void> delete(UUID id);
+    Mono<Page<ImplResponse>> findAll(UUID ownerId, Pageable pageable);
+    Mono<ImplResponse> findById(UUID ownerId, UUID id);
+    Mono<Page<ImplResponse>> findBySourceId(UUID ownerId, UUID sourceId, Pageable pageable);
+    Mono<ImplResponse> create(UUID ownerId, CreateImplRequest request);
+    Mono<ImplResponse> update(UUID ownerId, UUID id, UpdateImplRequest request);
+    Mono<Void> delete(UUID ownerId, UUID id);
 }

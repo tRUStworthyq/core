@@ -1,6 +1,7 @@
 package com.trustworthyq.core.collection.config;
 
 import com.trustworthyq.core.collection.dto.AgentRequest;
+import com.trustworthyq.core.collection.exception.InvalidAgentResponseException;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -9,7 +10,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.CommonErrorHandler;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JacksonJsonSerializer;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +23,13 @@ import java.util.Map;
 public class KafkaConfig {
 
     private final KafkaProperties kafkaProperties;
+
+    @Bean
+    public CommonErrorHandler kafkaErrorHandler() {
+        var handler = new DefaultErrorHandler(new FixedBackOff(5_000, FixedBackOff.UNLIMITED_ATTEMPTS));
+        handler.addNotRetryableExceptions(InvalidAgentResponseException.class);
+        return handler;
+    }
 
     public KafkaConfig(KafkaProperties kafkaProperties) {
         this.kafkaProperties = kafkaProperties;

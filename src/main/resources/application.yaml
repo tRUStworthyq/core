@@ -3,9 +3,25 @@ server:
 spring:
   kafka:
     bootstrap-servers: kafka:9092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: dacs-core-agent-responses
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 5
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+  ai:
+    model:
+      chat: ollama
+      embedding: none
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        model: ${OLLAMA_MODEL:qwen3:8b}
+        think: false
+        num-predict: 512
   application:
     name: core
   r2dbc:
@@ -31,9 +47,31 @@ logging:
 app:
   kafka:
     topic: DACS_agent_request
+    response-topic: DACS_agent_response
   pagination:
     chat-page-size: 20
     message-page-size: 30
     source-page-size: 20
     impl-page-size: 20
 
+
+  aging:
+    recent-days: 30
+    cooling-days: 90
+    unused-days: 180
+    audit-lag-days: 1
+    recent-usage: 0.1
+    cooling-usage: 0.7
+    unused-usage: 1.0
+    old-years: 3
+    small-bytes: 32
+    duplicate-weight: 0.35
+    name-weight: 0.15
+    folder-weight: 0.15
+    owner-weight: 0.20
+    old-weight: 0.10
+    small-weight: 0.05
+    cooling-score: 30
+    obsolete-score: 60
+    name-markers: [copy, копия, old, archive, temp, tmp, final_v2, черновик]
+    folder-markers: [archive, old, backup, "2020", "2021"]

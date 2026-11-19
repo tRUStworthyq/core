@@ -7,3 +7,9 @@ databaseChangeLog:
       relativeToChangelogFile: false
   - include:
       file: db/changelog/changes/003-create-sources-and-impl.yaml
+  - include:
+      file: db/changelog/changes/004-create-agent-response-batches.yaml
+  - include:
+      file: db/changelog/changes/005-own-collection-runs.yaml
+  - include:
+      file: db/changelog/changes/006-s3-archive.yaml

@@ -28,37 +28,38 @@ public class ImplServiceImpl implements ImplService {
     private final SourceRepository sourceRepository;
 
     @Override
-    public Mono<Page<ImplResponse>> findAll(Pageable pageable) {
-        return implRepository.findAllBy(pageable)
+    public Mono<Page<ImplResponse>> findAll(UUID ownerId, Pageable pageable) {
+        return implRepository.findByOwnerId(ownerId, pageable)
                 .map(this::toDto)
                 .collectList()
-                .zipWith(implRepository.count())
+                .zipWith(implRepository.countByOwnerId(ownerId))
                 .map(t -> new PageImpl<>(t.getT1(), pageable, t.getT2()));
     }
 
     @Override
-    public Mono<ImplResponse> findById(UUID id) {
-        return implRepository.findById(id)
+    public Mono<ImplResponse> findById(UUID ownerId, UUID id) {
+        return implRepository.findByIdAndOwnerId(id, ownerId)
                 .map(this::toDto)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Impl not found")));
     }
 
     @Override
-    public Mono<Page<ImplResponse>> findBySourceId(UUID sourceId, Pageable pageable) {
-        return implRepository.findBySourceId(sourceId, pageable)
+    public Mono<Page<ImplResponse>> findBySourceId(UUID ownerId, UUID sourceId, Pageable pageable) {
+        return implRepository.findBySourceIdAndOwnerId(sourceId, ownerId, pageable)
                 .map(this::toDto)
                 .collectList()
-                .zipWith(implRepository.countBySourceId(sourceId))
+                .zipWith(implRepository.countBySourceIdAndOwnerId(sourceId, ownerId))
                 .map(t -> new PageImpl<>(t.getT1(), pageable, t.getT2()));
     }
 
     @Override
-    public Mono<ImplResponse> create(CreateImplRequest request) {
+    public Mono<ImplResponse> create(UUID ownerId, CreateImplRequest request) {
         return sourceRepository.findById(request.getSourceId())
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Source not found")))
                 .flatMap(source -> {
                     Impl impl = Impl.builder()
                             .id(UUIDUtils.generateRandomUUID())
+                            .ownerId(ownerId)
                             .name(request.getName())
                             .config(request.getConfig())
                             .state(request.getState() != null ? request.getState() : ImplState.NOT_RUN)
@@ -71,8 +72,8 @@ public class ImplServiceImpl implements ImplService {
     }
 
     @Override
-    public Mono<ImplResponse> update(UUID id, UpdateImplRequest request) {
-        return implRepository.findById(id)
+    public Mono<ImplResponse> update(UUID ownerId, UUID id, UpdateImplRequest request) {
+        return implRepository.findByIdAndOwnerId(id, ownerId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Impl not found")))
                 .map(existing -> applyUpdate(existing, request))
                 .flatMap(implRepository::updateWithJsonbCast)
@@ -80,8 +81,8 @@ public class ImplServiceImpl implements ImplService {
     }
 
     @Override
-    public Mono<Void> delete(UUID id) {
-        return implRepository.findById(id)
+    public Mono<Void> delete(UUID ownerId, UUID id) {
+        return implRepository.findByIdAndOwnerId(id, ownerId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Impl not found")))
                 .flatMap(implRepository::delete);
     }
