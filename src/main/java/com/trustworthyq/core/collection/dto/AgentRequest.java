@@ -10,6 +10,7 @@ public record AgentRequest(
         String name,
         String config,
         ImplState state,
-        UUID sourceId
+        UUID sourceId,
+        java.util.Map<UUID, String> contentRules
 ) {
 }

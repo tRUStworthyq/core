@@ -49,7 +49,7 @@ public class S3OperationsController {
     @PostMapping("/archive/preview")
     public Mono<ArchivePreview> preview(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                         @RequestBody ObjectLocation source) {
-        return s3.archivePreview(UUID.fromString(jwt.getSubject()), id, source);
+        return archive.preview(UUID.fromString(jwt.getSubject()), id, source);
     }
 
     @PostMapping("/archive/confirm")
@@ -78,9 +78,21 @@ public class S3OperationsController {
         return archive.undoRestore(UUID.fromString(jwt.getSubject()), id, archiveId);
     }
 
+    @GetMapping("/archive/{archiveId}/delete-plan")
+    public Mono<S3Archive.DeletePlan> deletePlan(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                @PathVariable UUID archiveId,
+                                                @RequestParam(defaultValue = "false") boolean cascade) {
+        return archive.deletePlan(UUID.fromString(jwt.getSubject()), id, archiveId, cascade);
+    }
+
     @DeleteMapping("/archive/{archiveId}")
     public Mono<ArchivedObject> deleteArchive(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-                                               @PathVariable UUID archiveId) {
-        return archive.delete(UUID.fromString(jwt.getSubject()), id, archiveId);
+                                               @PathVariable UUID archiveId,
+                                               @RequestParam(defaultValue = "false") boolean cascade,
+                                               @RequestBody(required = false) DeletionConfirmation confirmation) {
+        return archive.delete(UUID.fromString(jwt.getSubject()), id, archiveId, cascade,
+                confirmation == null ? null : confirmation.ids());
     }
+
+    public record DeletionConfirmation(java.util.List<UUID> ids) {}
 }

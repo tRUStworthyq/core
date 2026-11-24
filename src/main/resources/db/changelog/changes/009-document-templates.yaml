@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-document-templates
+      author: dacs
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE document_templates (
+                  owner_id uuid NOT NULL,
+                  id uuid NOT NULL,
+                  name varchar(120) NOT NULL,
+                  path_contains varchar(512) NOT NULL,
+                  name_contains varchar(512) NOT NULL,
+                  content_contains varchar(512) NOT NULL,
+                  retention_days integer NOT NULL CHECK (retention_days BETWEEN 1 AND 36500),
+                  PRIMARY KEY (owner_id, id)
+              );
+      rollback:
+        - dropTable:
+            tableName: document_templates

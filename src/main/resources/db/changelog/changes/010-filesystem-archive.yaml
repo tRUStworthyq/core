@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-filesystem-archive
+      author: dacs
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE filesystem_archive (
+                  id uuid PRIMARY KEY,
+                  owner_id uuid NOT NULL,
+                  impl_id uuid NOT NULL,
+                  path text NOT NULL,
+                  size_bytes bigint NOT NULL,
+                  created_at timestamptz NOT NULL DEFAULT now()
+              );
+              CREATE INDEX filesystem_archive_page_idx
+                  ON filesystem_archive (owner_id, impl_id, created_at DESC, id DESC);
+      rollback:
+        - dropTable:
+            tableName: filesystem_archive

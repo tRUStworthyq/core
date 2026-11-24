@@ -106,7 +106,7 @@ public class OllamaChatServiceImpl implements OllamaChatService {
             this.requestId = requestId;
         }
 
-        @Tool(description = "Calculate file aging scores and explanations for a page in the attached S3 dataset.")
+        @Tool(description = "Calculate file aging scores and explanations for a page in the attached dataset.")
         public ReviewPage scoreFiles(@ToolParam(description = "Zero-based page offset") long offset,
                                            @ToolParam(description = "Number of objects, from 1 to 20") int limit) {
             int pageSize = Math.clamp(limit, 1, 20);

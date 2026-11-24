@@ -51,6 +51,6 @@ public class CollectController {
     public Mono<List<Assessment>> aging(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID requestId,
                                         @RequestParam(defaultValue = "0") long offset,
                                         @RequestParam(defaultValue = "50") int limit) {
-        return collectionService.assess(UUID.fromString(jwt.getSubject()), requestId, offset, limit);
+        return collectionService.recommendations(UUID.fromString(jwt.getSubject()), requestId, offset, limit);
     }
 }

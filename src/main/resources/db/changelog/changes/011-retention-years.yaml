@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-retention-years
+      author: dacs
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE document_templates ALTER COLUMN retention_days DROP NOT NULL;
+              ALTER TABLE document_templates ADD COLUMN retention_years integer;
+              ALTER TABLE document_templates ADD CONSTRAINT document_templates_retention_unit CHECK (
+                  (retention_days IS NOT NULL AND retention_years IS NULL) OR
+                  (retention_days IS NULL AND retention_years IS NOT NULL AND retention_years BETWEEN 1 AND 100)
+              );

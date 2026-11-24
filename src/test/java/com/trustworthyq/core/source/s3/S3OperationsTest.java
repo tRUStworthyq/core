@@ -102,22 +102,24 @@ class S3OperationsTest {
         var source = new ObjectLocation("documents", "reports/file.txt");
         var preview = operations.archivePreview(owner, implId, source).block();
         var archived = operations.archive(owner, implId, new ArchiveConfirmation(true, preview)).block().details();
+        assertThatThrownBy(() -> operations.deleteArchive(owner, implId, archived, preview.modifiedAt().minusSeconds(1)).block())
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("409");
         archiveETag.set("\"replacement\"");
-        assertThatThrownBy(() -> operations.deleteArchive(owner, implId, archived).block())
+        assertThatThrownBy(() -> operations.deleteArchive(owner, implId, archived, preview.modifiedAt()).block())
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("409");
         archiveETag.set("\"copied\"");
         eTag.set("\"replacement\"");
-        assertThatThrownBy(() -> operations.deleteArchive(owner, implId, archived).block())
+        assertThatThrownBy(() -> operations.deleteArchive(owner, implId, archived, preview.modifiedAt()).block())
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("409");
         assertThat(requests).noneMatch(value -> value.startsWith("DELETE"));
         eTag.set("\"original\"");
         rejectArchiveDelete.set(true);
-        assertThatThrownBy(() -> operations.deleteArchive(owner, implId, archived).block())
+        assertThatThrownBy(() -> operations.deleteArchive(owner, implId, archived, preview.modifiedAt()).block())
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("403");
         assertThat(eTag.get()).isNull();
         assertThat(archiveETag.get()).isEqualTo("\"copied\"");
-        operations.deleteArchive(owner, implId, archived).block();
-        operations.deleteArchive(owner, implId, archived).block();
+        operations.deleteArchive(owner, implId, archived, preview.modifiedAt()).block();
+        operations.deleteArchive(owner, implId, archived, preview.modifiedAt()).block();
         String archiveDelete = "DELETE /archive/" + archived.destination().key() + " match=\"copied\"";
         assertThat(requests.stream().filter(value -> value.startsWith("DELETE")).toList())
                 .containsExactly("DELETE /documents/reports/file.txt match=\"original\"", archiveDelete, archiveDelete);

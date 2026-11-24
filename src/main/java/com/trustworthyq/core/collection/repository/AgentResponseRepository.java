@@ -115,7 +115,16 @@ public class AgentResponseRepository {
 
     public Flux<ScoringObject> scoringObjects(UUID requestId, UUID ownerId, long offset, int limit,
                                              JsonMapper mapper) {
-        return database.sql("""
+        return scoringObjects(requestId, ownerId, offset, limit, mapper, false);
+    }
+
+    public Flux<ScoringObject> recommendationCandidates(UUID requestId, UUID ownerId, JsonMapper mapper) {
+        return scoringObjects(requestId, ownerId, 0, null, mapper, true);
+    }
+
+    private Flux<ScoringObject> scoringObjects(UUID requestId, UUID ownerId, long offset, Integer limit,
+                                               JsonMapper mapper, boolean recommendationsOnly) {
+        var query = database.sql("""
                 WITH objects AS (
                     SELECT metadata AS object, metadata->>'sha256' AS hash,
                            (metadata->>'modificationTime')::timestamptz AS modified,
@@ -133,10 +142,16 @@ public class AgentResponseRepository {
                 )
                 SELECT object::text, created_at, hash IS NOT NULL AND modified < newest AS newer_duplicate,
                        CASE WHEN hash IS NOT NULL AND copies > 1 THEN preferred END AS preferred
-                FROM ranked ORDER BY batch_index, position LIMIT :limit OFFSET :offset
+                FROM ranked
+                WHERE NOT :recommendationsOnly OR coalesce(object->'pii'->>'status', '')
+                    NOT IN ('DETECTED', 'REVIEW_REQUIRED', 'PARTIAL', 'ERROR')
+                ORDER BY batch_index, position LIMIT :limit OFFSET :offset
                 """)
                 .bind("id", requestId).bind("owner", ownerId)
-                .bind("offset", offset).bind("limit", limit)
+                .bind("offset", offset).bind("recommendationsOnly", recommendationsOnly);
+        var bounded = limit == null ? query.bindNull("limit", Integer.class)
+                .filter(statement -> statement.fetchSize(256)) : query.bind("limit", limit);
+        return bounded
                 .map((row, metadata) -> new ScoringObject(mapper.readTree(row.get("object", String.class)),
                         row.get("created_at", java.time.OffsetDateTime.class).toInstant(),
                         Boolean.TRUE.equals(row.get("newer_duplicate", Boolean.class)),

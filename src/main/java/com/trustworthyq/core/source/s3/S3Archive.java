@@ -1,6 +1,9 @@
 package com.trustworthyq.core.source.s3;
 
 import com.trustworthyq.core.source.s3.ArchivedObject.Details;
+import com.trustworthyq.core.collection.documents.DocumentIndex;
+import com.trustworthyq.core.source.s3.S3Operations.ObjectLocation;
+import reactor.core.publisher.Flux;
 
 import com.trustworthyq.core.source.s3.ArchivedObject.State;
 import com.trustworthyq.core.source.s3.S3Operations.ArchiveConfirmation;
@@ -18,6 +21,8 @@ import reactor.core.publisher.Mono;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.util.Objects;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,13 +34,26 @@ public class S3Archive {
     private final S3Operations storage;
     private final ImplService implementations;
     private final TransactionalOperator transaction;
+    private final DocumentIndex documents;
+
+    public Mono<ArchivePreview> preview(UUID owner, UUID impl, ObjectLocation source) {
+        return storage.archivePreview(owner, impl, source).flatMap(preview -> documents.load(owner, impl, null)
+                .map(index -> {
+                    String path = path(source);
+                    index.requireArchivable(path, preview.eTag());
+                    if (!Objects.equals(index.scannedModification(path, preview.eTag()), preview.modifiedAt())) {
+                        throw conflict("Документ изменился после сбора. Запустите сбор заново.");
+                    }
+                    return preview;
+                }));
+    }
 
     public Mono<ArchiveResult> create(UUID owner, UUID impl, ArchiveConfirmation confirmation) {
         if (!confirmation.confirmed() || confirmation.preview() == null) {
             return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Explicit archive confirmation required"));
         }
         ArchivePreview accepted = confirmation.preview();
-        return storage.archivePreview(owner, impl, accepted.source()).flatMap(preview -> {
+        return preview(owner, impl, accepted.source()).flatMap(preview -> {
             if (!preview.equals(accepted)) {
                 return Mono.error(conflict("Archive preview changed. Confirm the new preview."));
             }
@@ -97,17 +115,88 @@ public class S3Archive {
             if (object.state() != State.RESTORED) {
                 return Mono.error(conflict("Only restored objects can be returned to the archive"));
             }
-            return storage.verifyUndo(owner, impl, object.details()).thenReturn(object.details());
+            return documents.load(owner, impl, null).doOnNext(index -> index.requireArchivable(
+                    path(object.details().source()), sourceTag(object.details())))
+                    .then(storage.verifyUndo(owner, impl, object.details())).thenReturn(object.details());
         });
     }
 
-    public Mono<ArchivedObject> delete(UUID owner, UUID impl, UUID id) {
+    public Mono<DeletePlan> deletePlan(UUID owner, UUID impl, UUID id, boolean cascade) {
+        return plannedEntries(owner, impl, id, cascade).map(this::describePlan);
+    }
+
+    public Mono<ArchivedObject> delete(UUID owner, UUID impl, UUID id, boolean cascade, List<UUID> confirmed) {
+        return entry(owner, impl, id).flatMap(selected -> {
+            if (selected.state() == State.DELETED) return Mono.just(selected);
+            return plannedEntries(owner, impl, id, cascade).flatMap(entries -> {
+                if (cascade && !describePlan(entries).ids().equals(confirmed)) {
+                    return Mono.error(conflict("Список связанных документов изменился. Подтвердите удаление заново."));
+                }
+                return Flux.fromIterable(entries).concatMap(entry -> storage.verifyDeletion(owner, impl, entry.object().details(), entry.modified()))
+                        .thenMany(Flux.fromIterable(entries).concatMap(entry -> deleteEntry(owner, impl, entry.object().id(), entry.modified())))
+                        .last();
+            });
+        });
+    }
+
+    private Mono<List<PlannedEntry>> plannedEntries(UUID owner, UUID impl, UUID id, boolean cascade) {
+        return entry(owner, impl, id).flatMap(selected -> {
+            if (selected.state() != State.ARCHIVED && selected.state() != State.RESTORED) {
+                return Mono.error(conflict("Удаление доступно для записей в архиве или после восстановления."));
+            }
+            String source = path(selected.details().source());
+            return documents.load(owner, impl, null).flatMap(index -> {
+                var related = index.deletionPaths(source, sourceTag(selected.details()), cascade);
+                return Flux.fromIterable(related).filter(target -> !target.equals(source)).sort()
+                        .concatMap(target -> activeEntry(owner, impl, target))
+                        .concatWithValues(selected)
+                        .map(object -> new PlannedEntry(object, index.scannedModification(path(object.details().source()),
+                                sourceTag(object.details())))).collectList();
+            });
+        });
+    }
+
+    private Mono<ArchivedObject> entry(UUID owner, UUID impl, UUID id) {
+        return database.sql("""
+                SELECT id, state, created_at, payload::text AS payload FROM s3_archive
+                WHERE owner_id = :owner AND impl_id = :impl AND id = :id
+                """).bind("owner", owner).bind("impl", impl).bind("id", id).map((row, ignored) -> read(row)).one()
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Archive entry not found")));
+    }
+
+    private Mono<ArchivedObject> activeEntry(UUID owner, UUID impl, String path) {
+        return database.sql("""
+                SELECT id, state, created_at, payload::text AS payload FROM s3_archive
+                WHERE owner_id = :owner AND impl_id = :impl AND state IN ('ARCHIVED', 'RESTORED')
+                  AND 's3://' || (payload->'source'->>'bucket') || '/' || (payload->'source'->>'key') = :path
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """).bind("owner", owner).bind("impl", impl).bind("path", path).map((row, ignored) -> read(row)).one()
+                .switchIfEmpty(Mono.error(conflict("Сначала архивируйте связанный документ: " + path)));
+    }
+
+    private DeletePlan describePlan(List<PlannedEntry> entries) {
+        return new DeletePlan(entries.stream().map(entry -> entry.object().id()).toList(),
+                entries.stream().map(entry -> path(entry.object().details().source())).toList());
+    }
+
+    private static String path(ObjectLocation source) {
+        return "s3://" + source.bucket() + "/" + source.key();
+    }
+
+    private static String sourceTag(Details details) {
+        return (details.restored() == null ? details.original() : details.restored()).eTag();
+    }
+
+    public record DeletePlan(List<UUID> ids, List<String> paths) {}
+    private record PlannedEntry(ArchivedObject object, Instant modified) {}
+
+    private Mono<ArchivedObject> deleteEntry(UUID owner, UUID impl, UUID id, Instant modified) {
         return change(owner, impl, id, State.DELETED,
                 object -> {
                     if (object.state() == State.PENDING) {
                         return Mono.error(conflict("Complete the pending archive operation before deleting"));
                     }
-                    return storage.deleteArchive(owner, impl, object.details()).thenReturn(object.details());
+                    return storage.deleteArchive(owner, impl, object.details(), modified).thenReturn(object.details());
                 });
     }
 

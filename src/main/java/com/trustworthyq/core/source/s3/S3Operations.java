@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
@@ -113,18 +114,27 @@ public class S3Operations {
         }).then();
     }
 
-    Mono<Void> deleteArchive(UUID owner, UUID id, Details details) {
+    Mono<Void> verifyDeletion(UUID owner, UUID id, Details details, Instant modified) {
+        return deleteArchive(owner, id, details, modified, true);
+    }
+
+    Mono<Void> deleteArchive(UUID owner, UUID id, Details details, Instant modified) {
+        return deleteArchive(owner, id, details, modified, false);
+    }
+
+    private Mono<Void> deleteArchive(UUID owner, UUID id, Details details, Instant modified, boolean dryRun) {
         return execute(owner, id, (client, config) -> {
             checkStorage(config, details);
             var source = head(client, details.source(), null);
             var expectedSource = details.restored() == null ? details.original() : details.restored();
-            if (source != null && !identity(source).equals(expectedSource)) {
+            if (source != null && (!identity(source).equals(expectedSource) || !Objects.equals(modified, source.lastModified()))) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Original object has changed");
             }
             var copy = head(client, details.destination(), details.archive().versionId());
             if (copy != null && !identity(copy).equals(details.archive())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Archive copy has changed");
             }
+            if (dryRun) return true;
             if (source != null) {
                 client.deleteObject(request -> request.bucket(details.source().bucket())
                         .key(details.source().key())
@@ -192,7 +202,7 @@ public class S3Operations {
                 Objects.toString(head.lastModified(), "")));
         String key = "dacs-archive/managed/" + id + "/" + sha256(identity);
         return new ArchivePreview("ARCHIVE_CONFIRMATION_REQUIRED", source, new ObjectLocation(archiveBucket, key),
-                head.eTag(), head.versionId(), head.contentLength(), false);
+                head.eTag(), head.versionId(), head.contentLength(), false, head.lastModified());
     }
 
     private <T> Mono<T> execute(UUID owner, UUID id, BiFunction<S3Client, Config, T> operation) {
@@ -277,7 +287,7 @@ public class S3Operations {
     }
 
     public record ArchivePreview(String state, ObjectLocation source, ObjectLocation destination, String eTag, String versionId,
-                                 long sizeBytes, boolean sourceDeleted) {
+                                 long sizeBytes, boolean sourceDeleted, Instant modifiedAt) {
     }
 
     public record ArchiveConfirmation(boolean confirmed, ArchivePreview preview) {
